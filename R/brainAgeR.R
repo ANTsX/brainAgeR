@@ -117,7 +117,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8, sdAff = 0.0
       return( list( X, X2 ) )
       }
 
-  myX = myAug3D( imageAffSub, imageAff, batch_size = 2, sdAff = sdAff )
+  myX = myAug3D( imageAffSub, imageAff, batch_size = batch_size, sdAff = sdAff )
   pp = predict( model, myX )
   sitenames = c("DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
   mydf = data.frame(
