@@ -37,7 +37,8 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8, sdAff = 0.0
   avgImg2 = antsImageRead( avgimgfn2 ) %>% antsCopyImageInfo2( templateSub )
   bxt = brainExtraction( x )
   bxtThresh = thresholdImage( bxt, 0.5, Inf )
-  biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
+#  biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
+  biasField = n4BiasFieldCorrection( x, returnBiasField = T, shrinkFactor = 4 )
   x = x / biasField
   bvol = prod( antsGetSpacing( bxt ) ) * sum( bxt )
   xBrain = x * bxtThresh
