@@ -121,3 +121,46 @@ brainAge <- function( x, template, model, batch_size = 8 ) {
   mydf <- cbind( mydf, siteDF )
   return( list( predictions=mydf, model=model ) )
 }
+
+
+
+
+#' brainExtraction
+#'
+#' ANTs brain extraction implemented with a u-net
+#'
+#' @param x input image
+#' @param template input template, optional
+#' @param model input deep model, optional
+#' @param batch_size greater than 1 uses simulation to add variance in estimated values
+#' @return brain extraction
+#' @author Avants BB
+#' @examples
+#'
+#' \dontrun{
+#' myPredictions = brainExtraction( img )
+#' }
+#' @export brainExtraction
+brainExtraction <- function( x, template, model, batch_size = 8 ) {
+  #############################################################################################################
+  bxtModelFN = system.file( "extdata", "bxtUnet.h5", package = "brainAgeR", mustWork = TRUE )
+  templateFN = system.file( "extdata", "S_template3_resampled.nii.gz", package = "brainAgeR", mustWork = TRUE )
+  reorientTemplate <- antsImageRead( templateFN )
+  unetModel = load_model_hdf5( bxtModelFN )
+  centerOfMassTemplate <- getCenterOfMass( reorientTemplate )
+  centerOfMassImage <- getCenterOfMass(  x)
+  xfrm <- createAntsrTransform( type = "Euler3DTransform",
+      center = centerOfMassTemplate,
+      translation = centerOfMassImage - centerOfMassTemplate )
+  warpedImage <- applyAntsrTransformToImage( xfrm, x, reorientTemplate )
+  resampledImageSize <- dim( reorientTemplate )
+  batchX <- array( data = as.array( warpedImage ),
+      dim = c( 1, resampledImageSize, 1 ) )
+  batchX <- ( batchX - mean( batchX ) ) / sd( batchX )
+  predictedData <- unetModel %>% predict( batchX, verbose = 0 )
+  probabilityImage = as.antsImage( predictedData[1,,,,2] ) %>%
+      antsCopyImageInfo2( reorientTemplate )
+  probabilityImage <- applyAntsrTransformToImage( invertAntsrTransform( xfrm ),
+  probabilityImage,  x)
+  return( probabilityImage )
+  }
