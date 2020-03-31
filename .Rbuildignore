@@ -1,0 +1,15 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+\.travis\.yml$
+_config\.yml$
+_pkgdown.yml
+docs
+^ANTsRNet\.Rproj$
+^\.github$
+^index\.html$
+^requirements\.txt$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^codecov\.yml$
+^appveyor\.yml$
