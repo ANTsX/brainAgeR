@@ -8,3 +8,13 @@
 # brainAgeR
 
 brain age with deep learning.
+
+
+```
+library( brainAgeR )
+library( ANTsR )
+library( keras )
+img = antsImageRead( filename ) # T1 image
+bage = brainAge( img )
+bage[[1]][,1:4]
+```

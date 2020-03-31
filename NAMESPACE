@@ -2,6 +2,9 @@
 
 export(brainAge)
 export(brainExtraction)
+importFrom(ANTsR,antsApplyTransforms)
+importFrom(ANTsR,antsRegistration)
 importFrom(ANTsRNet,createResNetModel3D)
+importFrom(ANTsRNet,linMatchIntensity)
 importFrom(ANTsRNet,randomImageTransformAugmentation)
 importFrom(stats,rnorm)

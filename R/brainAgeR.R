@@ -5,6 +5,7 @@
 #' @param x input image
 #' @param template input template, optional
 #' @param model input deep model, optional
+#' @param polyOrder optional polynomial order for intensity matching (e.g. 1)
 #' @param batch_size greater than 1 uses simulation to add variance in estimated values
 #' @return data frame of predictions and the brain age model
 #' @author Avants BB
@@ -15,30 +16,30 @@
 #' }
 #' @export brainAge
 #' @importFrom stats rnorm
-#' @importFrom ANTsRNet createResNetModel3D randomImageTransformAugmentation
-brainAge <- function( x, template, model, batch_size = 8 ) {
+#' @importFrom ANTsRNet createResNetModel3D randomImageTransformAugmentation linMatchIntensity
+#' @importFrom ANTsR antsRegistration antsApplyTransforms
+brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
   library( keras )
   if ( missing( template ) ) {
     templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
+    templateFNB = system.file("extdata", "template_brain.nii.gz", package = "brainAgeR", mustWork = TRUE)
     }
   tardim = c( 192, 224, 192 )
-  template = antsImageRead( templateFN ) %>%
-    resampleImage( tardim , useVoxels=TRUE, interpType = 'linear' )
+  template = antsImageRead( templateFN )
+  template = resampleImage( template, tardim , useVoxels=TRUE, interpType = 'linear' )
+  template = template * resampleImageToTarget( antsImageRead( templateFNB ), template )
   templateSub = resampleImage( template, dim(template)/2,
             useVoxels=TRUE, interpType = 'linear' )
-
   avgimgfn1 = system.file("extdata", "avgImg.nii.gz", package = "brainAgeR", mustWork = TRUE)
   avgimgfn2 = system.file("extdata", "avgImg2.nii.gz", package = "brainAgeR", mustWork = TRUE)
   avgImg = antsImageRead( avgimgfn1 ) %>% antsCopyImageInfo2( template )
   avgImg2 = antsImageRead( avgimgfn2 ) %>% antsCopyImageInfo2( templateSub )
-
-  meanMask = thresholdImage( x, 0.5 * mean( x ), Inf ) %>%
-    morphology( "dilate", 3 ) %>% iMath("FillHoles")
-  x = n4BiasFieldCorrection( x, meanMask, shrinkFactor = 4 )
-  aff = antsRegistration( template, x, "Affine", verbose = F )
-  imageAffSub = antsApplyTransforms( templateSub, x, aff$fwdtransforms,
-            interpolator = c("linear") )
-
+  bxt = brainExtraction( x )
+  bxtThresh = thresholdImage( bxt, 0.5, Inf )
+  x = n4BiasFieldCorrection( x, bxtThresh, shrinkFactor = 4 )
+  bvol = prod( antsGetSpacing( bxt ) ) * sum( bxt )
+  aff = antsRegistration( template, x * thresholdImage( x, 0.5, Inf ),
+    "Affine", verbose = F )
   getRandomBaseInd <- function( off = 10, patchWidth = 96 ) {
     baseInd = rep( NA, 3 )
     for ( k in 1:3 )
@@ -77,6 +78,10 @@ brainAge <- function( x, template, model, batch_size = 8 ) {
         interpolator = c("linear") )
   imageAffSub = antsApplyTransforms( templateSub, x, aff$fwdtransforms,
         interpolator = c("linear") )
+  if ( ! missing( "polyOrder" ) ) {
+    imageAff = ANTsRNet::linMatchIntensity( imageAff, avgImg, polyOrder = polyOrder, truncate = TRUE )
+    imageAffSub = ANTsRNet::linMatchIntensity( imageAffSub, avgImg2, polyOrder = polyOrder, truncate = TRUE )
+    }
   fullDims = dim( imageAff )
   ptch = 96
 
@@ -119,6 +124,7 @@ brainAge <- function( x, template, model, batch_size = 8 ) {
   names( siteDF ) = sitenames
   for ( k in 1:nrow( siteDF ) ) siteDF[k,] = siteDF[k,]/sum(siteDF[k,] )
   mydf <- cbind( mydf, siteDF )
+  mydf$brainVolume = bvol
   return( list( predictions=mydf, model=model ) )
 }
 

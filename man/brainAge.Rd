@@ -4,7 +4,7 @@
 \alias{brainAge}
 \title{brainAge}
 \usage{
-brainAge(x, template, model, batch_size = 8)
+brainAge(x, template, model, polyOrder, batch_size = 8)
 }
 \arguments{
 \item{x}{input image}
@@ -12,6 +12,8 @@ brainAge(x, template, model, batch_size = 8)
 \item{template}{input template, optional}
 
 \item{model}{input deep model, optional}
+
+\item{polyOrder}{optional polynomial order for intensity matching (e.g. 1)}
 
 \item{batch_size}{greater than 1 uses simulation to add variance in estimated values}
 }
