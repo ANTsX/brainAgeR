@@ -4,7 +4,15 @@
 \alias{brainAge}
 \title{brainAge}
 \usage{
-brainAge(x, template, model, polyOrder, batch_size = 8, sdAff = 0.01)
+brainAge(
+  x,
+  template,
+  model,
+  polyOrder,
+  batch_size = 8,
+  sdAff = 0.01,
+  n4onBrain = TRUE
+)
 }
 \arguments{
 \item{x}{input image}
@@ -18,6 +26,8 @@ brainAge(x, template, model, polyOrder, batch_size = 8, sdAff = 0.01)
 \item{batch_size}{greater than 1 uses simulation to add variance in estimated values}
 
 \item{sdAff}{larger values induce more variance}
+
+\item{n4onBrain}{temporary option}
 }
 \value{
 data frame of predictions and the brain age model
