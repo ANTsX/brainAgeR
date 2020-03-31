@@ -7,6 +7,7 @@
 #' @param model input deep model, optional
 #' @param polyOrder optional polynomial order for intensity matching (e.g. 1)
 #' @param batch_size greater than 1 uses simulation to add variance in estimated values
+#' @param sdAff larger values induce more variance
 #' @return data frame of predictions and the brain age model
 #' @author Avants BB
 #' @examples
@@ -17,8 +18,8 @@
 #' @export brainAge
 #' @importFrom stats rnorm
 #' @importFrom ANTsRNet createResNetModel3D randomImageTransformAugmentation linMatchIntensity
-#' @importFrom ANTsR antsRegistration antsApplyTransforms
-brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
+#' @importFrom ANTsRCore antsRegistration antsApplyTransforms
+brainAge <- function( x, template, model, polyOrder, batch_size = 8, sdAff = 0.01 ) {
   library( keras )
   if ( missing( template ) ) {
     templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
@@ -116,7 +117,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
       return( list( X, X2 ) )
       }
 
-  myX = myAug3D( imageAffSub, imageAff, batch_size = 2, sdAff = 0.01 )
+  myX = myAug3D( imageAffSub, imageAff, batch_size = 2, sdAff = sdAff )
   pp = predict( model, myX )
   sitenames = c("DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
   mydf = data.frame(
