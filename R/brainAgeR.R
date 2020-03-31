@@ -27,7 +27,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
   tardim = c( 192, 224, 192 )
   template = antsImageRead( templateFN )
   template = resampleImage( template, tardim , useVoxels=TRUE, interpType = 'linear' )
-  template = template * resampleImageToTarget( antsImageRead( templateFNB ), template )
+  templateBrain = template * resampleImageToTarget( antsImageRead( templateFNB ), template )
   templateSub = resampleImage( template, dim(template)/2,
             useVoxels=TRUE, interpType = 'linear' )
   avgimgfn1 = system.file("extdata", "avgImg.nii.gz", package = "brainAgeR", mustWork = TRUE)
@@ -36,9 +36,11 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
   avgImg2 = antsImageRead( avgimgfn2 ) %>% antsCopyImageInfo2( templateSub )
   bxt = brainExtraction( x )
   bxtThresh = thresholdImage( bxt, 0.5, Inf )
-  x = n4BiasFieldCorrection( x, bxtThresh, shrinkFactor = 4 )
+  biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
+  x = x / biasField
   bvol = prod( antsGetSpacing( bxt ) ) * sum( bxt )
-  aff = antsRegistration( template, x * thresholdImage( x, 0.5, Inf ),
+  xBrain = x * bxtThresh
+  aff = antsRegistration( iMath(templateBrain,"Normalize"), iMath(xBrain,"Normalize"),
     "Affine", verbose = F )
   getRandomBaseInd <- function( off = 10, patchWidth = 96 ) {
     baseInd = rep( NA, 3 )
@@ -51,7 +53,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
       nclass = 6
       ncogs = 1
       modelFN = system.file("extdata", "resNet4LayerLR64Card64b.h5", package = "brainAgeR", mustWork = TRUE)
-      inputImageSize = c( dim( template ),  2  )
+      inputImageSize = c( dim( templateSub ),  2  )
       mdl <- ANTsRNet::createResNetModel3D(inputImageSize, numberOfClassificationLabels = 1000,
              layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
              lowestResolution = 64, cardinality = 64, mode = "classification")
@@ -75,9 +77,9 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
 
 
   imageAff = antsApplyTransforms( template, x, aff$fwdtransforms,
-        interpolator = c("linear") )
+        interpolator = c("linear") ) %>% iMath("Normalize")
   imageAffSub = antsApplyTransforms( templateSub, x, aff$fwdtransforms,
-        interpolator = c("linear") )
+        interpolator = c("linear") ) %>% iMath("Normalize")
   if ( ! missing( "polyOrder" ) ) {
     imageAff = ANTsRNet::linMatchIntensity( imageAff, avgImg, polyOrder = polyOrder, truncate = TRUE )
     imageAffSub = ANTsRNet::linMatchIntensity( imageAffSub, avgImg2, polyOrder = polyOrder, truncate = TRUE )
@@ -87,7 +89,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
 
   myAug3D <- function( img2, imgFull, batch_size = 1, sdAff = 0.0 ) {
         nc = 2
-        X = array( dim = c( batch_size, dim( template ), nc ) )
+        X = array( dim = c( batch_size, dim( templateSub ), nc ) )
         X2 = array( dim = c( batch_size, rep(ptch,3), nc ) )
         for ( ind in 1:batch_size ) {
           imgG = iMath( img2, "Normalize" )
@@ -114,7 +116,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8 ) {
       return( list( X, X2 ) )
       }
 
-  myX = myAug3D( imageAffSub, imageAff, batch_size = batch_size, sdAff = 0.01 )
+  myX = myAug3D( imageAffSub, imageAff, batch_size = 2, sdAff = 0.01 )
   pp = predict( model, myX )
   sitenames = c("DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
   mydf = data.frame(

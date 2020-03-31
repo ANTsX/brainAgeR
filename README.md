@@ -10,6 +10,8 @@
 brain age with deep learning.
 
 
+minimal example
+
 ```
 library( brainAgeR )
 library( ANTsR )
