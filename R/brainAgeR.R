@@ -156,7 +156,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8,
       }
 
   imageAff = baprepro$imageAffine
-  imageAffSub = resampleImageToTarget( imageAff, templateSub ) %>% iMath("Normalize")
+  imageAffSub = resampleImageToTarget( imageAff, templateSub )
   if ( ! missing( "polyOrder" ) ) {
     imageAff = ANTsRNet::linMatchIntensity( imageAff, avgImg, polyOrder = polyOrder, truncate = TRUE )
     imageAffSub = ANTsRNet::linMatchIntensity( imageAffSub, avgImg2, polyOrder = polyOrder, truncate = TRUE )
@@ -169,12 +169,12 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8,
         X = array( dim = c( batch_size, dim( templateSub ), nc ) )
         X2 = array( dim = c( batch_size, rep(ptch,3), nc ) )
         for ( ind in 1:batch_size ) {
-          imgG = iMath( img2, "Normalize" )
-          if ( all(   dim(imgG) == dim( avgImg2 ) ) ) {
+          imgG = img2
+          if ( all(   dim(img2) == dim( avgImg2 ) ) ) {
             antsCopyImageInfo(avgImg2,  imgG )
             imgGdiff = imgG - avgImg2
           } else stop("dim(imgG) != dim( avgImg2 )")
-          fullImage = iMath( imgFull, "Normalize" )
+          fullImage = imgFull
           if ( all(   dim(fullImage) == dim( avgImg ) ) )
             pdiff = fullImage - avgImg else stop("dim(fullImage) != dim( avgImg )")
           baseInd = getRandomBaseInd()
@@ -184,7 +184,7 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8,
           randy = ANTsRNet::randomImageTransformAugmentation( imgG,
             interpolator = c("linear","linear"),
             list( list( imgG, imgGdiff ) ), list( imgGdiff ), sdAffine = sdAff, n = 1 )
-          imgG = randy$outputPredictorList[[1]][[1]] %>% iMath("Normalize")
+          imgG = randy$outputPredictorList[[1]][[1]]
           X[ ind, , , , 1 ] = as.array( imgG ) #  * 255 - 127.5
           X[ ind, , , , 2 ] = as.array( randy$outputPredictorList[[1]][[2]] ) # * 255 - 127.5
           X2[ind, , , , 1 ] = as.array( patch ) #  * 255 - 127.5
