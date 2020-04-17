@@ -26,6 +26,7 @@ standardizeIntensity <- function( x, mask, quantiles = c(0.01,0.99) ) {
 #'
 #' @param x input image
 #' @param template input template, optional
+#' @param templateBrainMask input template brain mask, optional
 #' @return preprocessing in a list
 #' \itemize{
 #'   \item{"imageAffine": }{Affine transformed and intensity normalized image.}
@@ -40,16 +41,17 @@ standardizeIntensity <- function( x, mask, quantiles = c(0.01,0.99) ) {
 #' myPre = brainAgePreprocessing( img )
 #' }
 #' @export
-brainAgePreprocessing <- function( x, template ) {
+brainAgePreprocessing <- function( x, template, templateBrainMask ) {
   library( keras )
   if ( missing( template ) ) {
     templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
     templateFNB = system.file("extdata", "template_brain.nii.gz", package = "brainAgeR", mustWork = TRUE)
+    template = antsImageRead( templateFN )
+    templateBrainMask = antsImageRead( templateFNB )
     }
   tardim = c( 192, 224, 192 )
-  template = antsImageRead( templateFN )
   template = resampleImage( template, tardim , useVoxels=TRUE, interpType = 'linear' )
-  templateBrain = template * resampleImageToTarget( antsImageRead( templateFNB ), template )
+  templateBrain = template * resampleImageToTarget( templateBrainMask, template )
   templateSub = resampleImage( template, dim(template)/2,
             useVoxels=TRUE, interpType = 'linear' )
   avgimgfn1 = system.file("extdata", "avgImg.nii.gz", package = "brainAgeR", mustWork = TRUE)
@@ -86,6 +88,7 @@ brainAgePreprocessing <- function( x, template ) {
 #'
 #' @param x input image
 #' @param template input template, optional
+#' @param templateBrainMask input template brain mask, optional
 #' @param model input deep model, optional
 #' @param polyOrder optional polynomial order for intensity matching (e.g. 1)
 #' @param batch_size greater than 1 uses simulation to add variance in estimated values
@@ -101,17 +104,23 @@ brainAgePreprocessing <- function( x, template ) {
 #' @importFrom stats rnorm
 #' @importFrom ANTsRNet createResNetModel3D randomImageTransformAugmentation linMatchIntensity
 #' @importFrom ANTsRCore antsRegistration antsApplyTransforms
-brainAge <- function( x, template, model, polyOrder, batch_size = 8,
+brainAge <- function( x,
+  template,
+  templateBrainMask,
+  model,
+  polyOrder,
+  batch_size = 8,
   sdAff = 0.01 ) {
   library( keras )
   if ( missing( template ) ) {
     templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
     templateFNB = system.file("extdata", "template_brain.nii.gz", package = "brainAgeR", mustWork = TRUE)
+    template = antsImageRead( templateFN )
+    templateBrainMask = antsImageRead( templateFNB )
     }
   tardim = c( 192, 224, 192 )
-  template = antsImageRead( templateFN )
   template = resampleImage( template, tardim , useVoxels=TRUE, interpType = 'linear' )
-  templateBrain = template * resampleImageToTarget( antsImageRead( templateFNB ), template )
+  templateBrain = template * resampleImageToTarget( templateBrainMask, template )
   templateSub = resampleImage( template, dim(template)/2,
             useVoxels=TRUE, interpType = 'linear' )
   avgimgfn1 = system.file("extdata", "avgImg.nii.gz", package = "brainAgeR", mustWork = TRUE)

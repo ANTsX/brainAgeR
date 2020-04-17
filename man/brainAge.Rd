@@ -4,12 +4,22 @@
 \alias{brainAge}
 \title{brainAge}
 \usage{
-brainAge(x, template, model, polyOrder, batch_size = 8, sdAff = 0.01)
+brainAge(
+  x,
+  template,
+  templateBrainMask,
+  model,
+  polyOrder,
+  batch_size = 8,
+  sdAff = 0.01
+)
 }
 \arguments{
 \item{x}{input image}
 
 \item{template}{input template, optional}
+
+\item{templateBrainMask}{input template brain mask, optional}
 
 \item{model}{input deep model, optional}
 
