@@ -3,6 +3,7 @@
 export(brainAge)
 export(brainAgePreprocessing)
 export(brainExtraction)
+export(standardizeIntensity)
 importFrom(ANTsRCore,antsApplyTransforms)
 importFrom(ANTsRCore,antsRegistration)
 importFrom(ANTsRNet,createResNetModel3D)

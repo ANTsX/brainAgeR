@@ -1,3 +1,25 @@
+#' standardizeIntensity
+#'
+#' Robust intensity standardization method
+#'
+#' @param x input image
+#' @param mask input image mask
+#' @param quantiles two-vector defining quantiles in the range of 0 to 1
+#' @return image
+#' @author Avants BB
+#' @examples
+#'
+#' \dontrun{
+#' imgn = standardizeIntensity( img )
+#' }
+#' @export
+standardizeIntensity <- function( x, mask, quantiles = c(0.01,0.99) ) {
+  if ( missing( mask ) ) mask = getMask( x )
+  temp = x - quantile( x[mask==1], quantiles[1] )
+  temp = temp / quantile( temp[mask==1], quantiles[2] )
+  return( temp )
+}
+
 #' brainAgePreprocessing
 #'
 #' MRI preprocessing for brain age
@@ -48,8 +70,7 @@ brainAgePreprocessing <- function( x, template, n4onBrain = TRUE ) {
         interpolator = c("linear") ) %>% iMath("Normalize")
   bxtAff = antsApplyTransforms( template, bxtThresh, aff$fwdtransforms,
               interpolator = c("nearestNeighbor") )
-  imageAff = imageAff - min( imageAff[ bxtAff == 1 ] )
-  imageAff = imageAff / max( imageAff[ bxtAff == 1 ] )
+  imageAff = standardizeIntensity( imageAff, bxtAff, quantiles=c(0.01,0.99) )
   return(
     list(
       imageAffine = imageAff,
