@@ -1,3 +1,63 @@
+#' brainAgePreprocessing
+#'
+#' MRI preprocessing for brain age
+#'
+#' @param x input image
+#' @param template input template, optional
+#' @param n4onBrain temporary option
+#' @return preprocessing in a list
+#' \itemize{
+#'   \item{"imageAffine": }{Affine transformed and intensity normalized image.}
+#'   \item{"brainMask": }{brain extraction probability mask.}
+#'   \item{"biasField": }{\code{n4} bias field output}
+#'   \item{"affineMapping": }{\code{antsRegistration} output}
+#'   }
+#' @author Avants BB
+#' @examples
+#'
+#' \dontrun{
+#' myPre = brainAgePreprocessing( img )
+#' }
+#' @export
+brainAgePreprocessing <- function( x, template, n4onBrain = TRUE ) {
+  library( keras )
+  if ( missing( template ) ) {
+    templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
+    templateFNB = system.file("extdata", "template_brain.nii.gz", package = "brainAgeR", mustWork = TRUE)
+    }
+  tardim = c( 192, 224, 192 )
+  template = antsImageRead( templateFN )
+  template = resampleImage( template, tardim , useVoxels=TRUE, interpType = 'linear' )
+  templateBrain = template * resampleImageToTarget( antsImageRead( templateFNB ), template )
+  templateSub = resampleImage( template, dim(template)/2,
+            useVoxels=TRUE, interpType = 'linear' )
+  avgimgfn1 = system.file("extdata", "avgImg.nii.gz", package = "brainAgeR", mustWork = TRUE)
+  avgimgfn2 = system.file("extdata", "avgImg2.nii.gz", package = "brainAgeR", mustWork = TRUE)
+  avgImg = antsImageRead( avgimgfn1 ) %>% antsCopyImageInfo2( template )
+  avgImg2 = antsImageRead( avgimgfn2 ) %>% antsCopyImageInfo2( templateSub )
+  bxt = brainExtraction( x )
+  bxtThresh = thresholdImage( bxt, 0.5, Inf )
+  if ( n4onBrain ) biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
+  if ( !n4onBrain ) biasField = n4BiasFieldCorrection( x, returnBiasField = T, shrinkFactor = 4 )
+  x = x / biasField
+  bvol = prod( antsGetSpacing( bxt ) ) * sum( bxt )
+  xBrain = x * bxtThresh
+  aff = antsRegistration( iMath(templateBrain,"Normalize"), iMath( xBrain, "Normalize" ),
+    "Affine", verbose = F )
+  imageAff = antsApplyTransforms( template, x, aff$fwdtransforms,
+        interpolator = c("linear") ) %>% iMath("Normalize")
+  bxtAff = antsApplyTransforms( template, bxtThresh, aff$fwdtransforms,
+              interpolator = c("nearestNeighbor") )
+  imageAff = imageAff - min( imageAff[ bxtAff == 1 ] )
+  imageAff = imageAff / max( imageAff[ bxtAff == 1 ] )
+  return(
+    list(
+      imageAffine = imageAff,
+      brainMask = bxt,
+      biasField = biasField,
+      affineMapping = aff ) )
+}
+
 #' brainAge
 #'
 #' Estimate brain age and related variable from input T1 MRI
@@ -37,15 +97,10 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8,
   avgimgfn2 = system.file("extdata", "avgImg2.nii.gz", package = "brainAgeR", mustWork = TRUE)
   avgImg = antsImageRead( avgimgfn1 ) %>% antsCopyImageInfo2( template )
   avgImg2 = antsImageRead( avgimgfn2 ) %>% antsCopyImageInfo2( templateSub )
-  bxt = brainExtraction( x )
+  baprepro = brainAgePreprocessing( x )
+  bxt = baprepro$brainMask
   bxtThresh = thresholdImage( bxt, 0.5, Inf )
-  if ( n4onBrain ) biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
-  if ( !n4onBrain ) biasField = n4BiasFieldCorrection( x, returnBiasField = T, shrinkFactor = 4 )
-  x = x / biasField
   bvol = prod( antsGetSpacing( bxt ) ) * sum( bxt )
-  xBrain = x * bxtThresh
-  aff = antsRegistration( iMath(templateBrain,"Normalize"), iMath(xBrain,"Normalize"),
-    "Affine", verbose = F )
   getRandomBaseInd <- function( off = 10, patchWidth = 96 ) {
     baseInd = rep( NA, 3 )
     for ( k in 1:3 )
@@ -79,11 +134,8 @@ brainAge <- function( x, template, model, polyOrder, batch_size = 8,
       load_model_weights_hdf5( model, modelFN )
       }
 
-
-  imageAff = antsApplyTransforms( template, x, aff$fwdtransforms,
-        interpolator = c("linear") ) %>% iMath("Normalize")
-  imageAffSub = antsApplyTransforms( templateSub, x, aff$fwdtransforms,
-        interpolator = c("linear") ) %>% iMath("Normalize")
+  imageAff = baprepro$imageAffine
+  imageAffSub = resampleImageToTarget( imageAff, templateSub ) %>% iMath("Normalize")
   if ( ! missing( "polyOrder" ) ) {
     imageAff = ANTsRNet::linMatchIntensity( imageAff, avgImg, polyOrder = polyOrder, truncate = TRUE )
     imageAffSub = ANTsRNet::linMatchIntensity( imageAffSub, avgImg2, polyOrder = polyOrder, truncate = TRUE )
