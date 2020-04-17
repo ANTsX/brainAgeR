@@ -4,14 +4,12 @@
 \alias{brainAgePreprocessing}
 \title{brainAgePreprocessing}
 \usage{
-brainAgePreprocessing(x, template, n4onBrain = TRUE)
+brainAgePreprocessing(x, template)
 }
 \arguments{
 \item{x}{input image}
 
 \item{template}{input template, optional}
-
-\item{n4onBrain}{temporary option}
 }
 \value{
 preprocessing in a list

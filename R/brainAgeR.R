@@ -26,7 +26,6 @@ standardizeIntensity <- function( x, mask, quantiles = c(0.01,0.99) ) {
 #'
 #' @param x input image
 #' @param template input template, optional
-#' @param n4onBrain temporary option
 #' @return preprocessing in a list
 #' \itemize{
 #'   \item{"imageAffine": }{Affine transformed and intensity normalized image.}
@@ -41,7 +40,7 @@ standardizeIntensity <- function( x, mask, quantiles = c(0.01,0.99) ) {
 #' myPre = brainAgePreprocessing( img )
 #' }
 #' @export
-brainAgePreprocessing <- function( x, template, n4onBrain = TRUE ) {
+brainAgePreprocessing <- function( x, template ) {
   library( keras )
   if ( missing( template ) ) {
     templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
@@ -57,10 +56,12 @@ brainAgePreprocessing <- function( x, template, n4onBrain = TRUE ) {
   avgimgfn2 = system.file("extdata", "avgImg2.nii.gz", package = "brainAgeR", mustWork = TRUE)
   avgImg = antsImageRead( avgimgfn1 ) %>% antsCopyImageInfo2( template )
   avgImg2 = antsImageRead( avgimgfn2 ) %>% antsCopyImageInfo2( templateSub )
-  bxt = brainExtraction( x )
+  meanMask = thresholdImage( x, 0.5 * mean( x ), Inf ) %>%
+    morphology( "dilate", 3 ) %>% iMath("FillHoles")
+  biasField = n4BiasFieldCorrection( x, meanMask, returnBiasField = T, shrinkFactor = 4 )
+  bxt = brainExtraction( x / biasField )
   bxtThresh = thresholdImage( bxt, 0.5, Inf )
-  if ( n4onBrain ) biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
-  if ( !n4onBrain ) biasField = n4BiasFieldCorrection( x, returnBiasField = T, shrinkFactor = 4 )
+  biasField = n4BiasFieldCorrection( x, bxtThresh, returnBiasField = T, shrinkFactor = 4 )
   x = x / biasField
   bvol = prod( antsGetSpacing( bxt ) ) * sum( bxt )
   xBrain = x * bxtThresh
@@ -89,7 +90,6 @@ brainAgePreprocessing <- function( x, template, n4onBrain = TRUE ) {
 #' @param polyOrder optional polynomial order for intensity matching (e.g. 1)
 #' @param batch_size greater than 1 uses simulation to add variance in estimated values
 #' @param sdAff larger values induce more variance
-#' @param n4onBrain temporary option
 #' @return data frame of predictions and the brain age model
 #' @author Avants BB
 #' @examples
@@ -102,7 +102,7 @@ brainAgePreprocessing <- function( x, template, n4onBrain = TRUE ) {
 #' @importFrom ANTsRNet createResNetModel3D randomImageTransformAugmentation linMatchIntensity
 #' @importFrom ANTsRCore antsRegistration antsApplyTransforms
 brainAge <- function( x, template, model, polyOrder, batch_size = 8,
-  sdAff = 0.01, n4onBrain = TRUE ) {
+  sdAff = 0.01 ) {
   library( keras )
   if ( missing( template ) ) {
     templateFN = system.file("extdata", "template.nii.gz", package = "brainAgeR", mustWork = TRUE)
