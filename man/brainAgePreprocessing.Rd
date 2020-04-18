@@ -18,6 +18,7 @@ preprocessing in a list
 \itemize{
 \item{"imageAffine": }{Affine transformed and intensity normalized image.}
 \item{"brainMask": }{brain extraction probability mask.}
+\item{"brainMaskAffine": }{brain extraction probability mask, affine transformed.}
 \item{"biasField": }{\code{n4} bias field output}
 \item{"affineMapping": }{\code{antsRegistration} output}
 }

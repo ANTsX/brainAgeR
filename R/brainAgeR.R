@@ -31,6 +31,7 @@ standardizeIntensity <- function( x, mask, quantiles = c(0.01,0.99) ) {
 #' \itemize{
 #'   \item{"imageAffine": }{Affine transformed and intensity normalized image.}
 #'   \item{"brainMask": }{brain extraction probability mask.}
+#'   \item{"brainMaskAffine": }{brain extraction probability mask, affine transformed.}
 #'   \item{"biasField": }{\code{n4} bias field output}
 #'   \item{"affineMapping": }{\code{antsRegistration} output}
 #'   }
@@ -78,6 +79,7 @@ brainAgePreprocessing <- function( x, template, templateBrainMask ) {
     list(
       imageAffine = imageAff,
       brainMask = bxt,
+      brainMaskAffine = bxtAff,
       biasField = biasField,
       affineMapping = aff ) )
 }
@@ -198,7 +200,7 @@ brainAge <- function( x,
       return( X )
       }
 
-  myX = myAug3D( imageAff, bxt, batch_size = batch_size, sdAff = sdAff )
+  myX = myAug3D( imageAff, baprepro$brainMaskAffine, batch_size = batch_size, sdAff = sdAff )
   pp = predict( model, myX )
   sitenames = c("DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
   mydf = data.frame(
