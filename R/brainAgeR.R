@@ -139,10 +139,11 @@ brainAge <- function( x,
     }
 
     if ( missing( model ) ) {
-      nclass = 6
+      nclass = 7
       ncogs = 1
       modelFN = system.file("extdata", "resNet4LayerLR64Card64b.h5", package = "brainAgeR", mustWork = TRUE)
-      inputImageSize = c( dim( templateSub ),  2  )
+      nChannels = 4
+      inputImageSize = list(NULL,NULL,NULL, nChannels )
       mdl <- ANTsRNet::createResNetModel3D(inputImageSize, numberOfClassificationLabels = 1000,
              layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
              lowestResolution = 64, cardinality = 64, mode = "classification")
@@ -153,15 +154,13 @@ brainAge <- function( x,
       ageLayer <- layer_dense( get_layer(mdl, layerName )$output, ncogs, activation = 'linear' )
       sexLayer <- layer_dense( get_layer(mdl, layerName )$output, 1,
         activation = 'sigmoid' )
-      ptch = 96
-      patchShape = c( rep( ptch, 3 ) , 2 )
-      inputPatch <- layer_input( patchShape )
-      model <- keras_model( inputs = list( mdl$input, inputPatch ),
+#      inputPatch <- layer_input( patchShape )
+      model <- keras_model( inputs = mdl$input, # list( mdl$input, inputPatch ),
           outputs = list(
             idLayer,
             ageLayer,
             sexLayer ) )
-      load_model_weights_hdf5( model, modelFN )
+      load_model_weights_hdf5( model, modelFN, by_name = TRUE )
       }
 
   imageAff = baprepro$imageAffine
@@ -173,36 +172,33 @@ brainAge <- function( x,
   fullDims = dim( imageAff )
   ptch = 96
 
-  myAug3D <- function( img2, imgFull, batch_size = 1, sdAff = 0.0 ) {
+  myAug3D <- function( fullImage, brainMask, batch_size = 1, sdAff = 0.0 ) {
         nc = 2
         X = array( dim = c( batch_size, dim( templateSub ), nc ) )
         X2 = array( dim = c( batch_size, rep(ptch,3), nc ) )
         for ( ind in 1:batch_size ) {
-          imgG = img2
-          if ( all(   dim(img2) == dim( avgImg2 ) ) ) {
-            antsCopyImageInfo(avgImg2,  imgG )
-            imgGdiff = imgG - avgImg2
-          } else stop("dim(imgG) != dim( avgImg2 )")
-          fullImage = imgFull
-          if ( all(   dim(fullImage) == dim( avgImg ) ) )
-            pdiff = fullImage - avgImg else stop("dim(fullImage) != dim( avgImg )")
-          baseInd = getRandomBaseInd()
-          topInd = baseInd + c( ptch, ptch, ptch ) - 1
-          patch = cropIndices( fullImage, baseInd, topInd )
-          pdiff = cropIndices( pdiff, baseInd, topInd )
-          randy = ANTsRNet::randomImageTransformAugmentation( imgG,
-            interpolator = c("linear","linear"),
-            list( list( imgG, imgGdiff ) ), list( imgGdiff ), sdAffine = sdAff, n = 1 )
-          imgG = randy$outputPredictorList[[1]][[1]]
+          bmask = thresholdImage( brainMask, 0.33, Inf )
+          fullImage = brainAgeR::standardizeIntensity( fullImage, bmask ) * bmask
+          randy = randomImageTransformAugmentation( fullImage,
+            interpolator = c( "linear", "linear" ),
+            list( list( fullImage, fullImage ) ), list( fullImage ), sdAffine = sdaff, n = 1 )
+          fullImage = randy$outputPredictorList[[1]][[1]]
+          imgG = resampleImageToTarget( fullImage, avgImg2 )
+          imgGdiff = imgG - avgImg2
+          pdiff = fullImage - avgImg
+          patch = cropIndices( fullImage, dim(fullImage)/4, dim(fullImage)/4+dim(fullImage)/2-1)
+          pdiff = cropIndices( pdiff, dim(fullImage)/4, dim(fullImage)/4+dim(fullImage)/2-1)
           X[ ind, , , , 1 ] = as.array( imgG ) #  * 255 - 127.5
-          X[ ind, , , , 2 ] = as.array( randy$outputPredictorList[[1]][[2]] ) # * 255 - 127.5
-          X2[ind, , , , 1 ] = as.array( patch ) #  * 255 - 127.5
-          X2[ind, , , , 2 ] = as.array( pdiff ) # * 255 - 127.5
+          X[ ind, , , , 2 ] = as.array( imgGdiff ) # * 255 - 127.5
+          X[ ind, , , , 3 ] = as.array( patch ) #  * 255 - 127.5
+          X[ ind, , , , 4 ] = as.array( pdiff ) # * 255 - 127.5
+#          X2[ind, , , , 1 ] = as.array( patch ) #  * 255 - 127.5
+#          X2[ind, , , , 2 ] = as.array( pdiff ) # * 255 - 127.5
         }
-      return( list( X, X2 ) )
+      return( X )
       }
 
-  myX = myAug3D( imageAffSub, imageAff, batch_size = batch_size, sdAff = sdAff )
+  myX = myAug3D( imageAff, bxt, batch_size = batch_size, sdAff = sdAff )
   pp = predict( model, myX )
   sitenames = c("DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
   mydf = data.frame(
