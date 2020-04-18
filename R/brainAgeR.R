@@ -172,12 +172,10 @@ brainAge <- function( x,
     imageAffSub = ANTsRNet::linMatchIntensity( imageAffSub, avgImg2, polyOrder = polyOrder, truncate = TRUE )
     }
   fullDims = dim( imageAff )
-  ptch = 96
-
   myAug3D <- function( fullImage, brainMask, batch_size = 1, sdAff = 0.0 ) {
         nc = 2
         X = array( dim = c( batch_size, dim( templateSub ), nc ) )
-        X2 = array( dim = c( batch_size, rep(ptch,3), nc ) )
+        X2 = array( dim = c( batch_size, dim( templateSub ), nc ) )
         bmask = thresholdImage( brainMask, 0.33, Inf )
         fullImage = brainAgeR::standardizeIntensity( fullImage, bmask ) * bmask
         randy = ANTsRNet::randomImageTransformAugmentation( fullImage,
