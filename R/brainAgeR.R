@@ -140,11 +140,11 @@ brainAge <- function( x,
     return( baseInd )
     }
 
+    nChannels = 4
     if ( missing( model ) ) {
       nclass = 7
       ncogs = 1
       modelFN = system.file("extdata", "resNet4LayerLR64Card64b.h5", package = "brainAgeR", mustWork = TRUE)
-      nChannels = 4
       inputImageSize = list(NULL,NULL,NULL, nChannels )
       mdl <- ANTsRNet::createResNetModel3D(inputImageSize, numberOfClassificationLabels = 1000,
              layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
@@ -173,9 +173,8 @@ brainAge <- function( x,
     }
   fullDims = dim( imageAff )
   myAug3D <- function( fullImage, brainMask, batch_size = 1, sdAff = 0.0 ) {
-        nc = 2
-        X = array( dim = c( batch_size, dim( templateSub ), nc ) )
-        X2 = array( dim = c( batch_size, dim( templateSub ), nc ) )
+        X = array( dim = c( batch_size, dim( templateSub ), nChannels ) )
+        # X2 = array( dim = c( batch_size, dim( templateSub ), nc ) )
         bmask = thresholdImage( brainMask, 0.33, Inf )
         fullImage = brainAgeR::standardizeIntensity( fullImage, bmask ) * bmask
         randy = ANTsRNet::randomImageTransformAugmentation( fullImage,
