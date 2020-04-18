@@ -181,7 +181,7 @@ brainAge <- function( x,
         for ( ind in 1:batch_size ) {
           bmask = thresholdImage( brainMask, 0.33, Inf )
           fullImage = brainAgeR::standardizeIntensity( fullImage, bmask ) * bmask
-          randy = randomImageTransformAugmentation( fullImage,
+          randy = ANTsRNet::randomImageTransformAugmentation( fullImage,
             interpolator = c( "linear", "linear" ),
             list( list( fullImage, fullImage ) ), list( fullImage ), sdAffine = sdaff, n = 1 )
           fullImage = randy$outputPredictorList[[1]][[1]]
