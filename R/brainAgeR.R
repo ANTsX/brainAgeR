@@ -202,7 +202,7 @@ brainAge <- function( x,
 
   myX = myAug3D( imageAff, baprepro$brainMaskAffine, batch_size = batch_size, sdAff = sdAff )
   pp = predict( model, myX )
-  sitenames = c("DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
+  sitenames = c( "ADNI", "DLBS","HCP","IXI","NKIRockland","OAS1_","SALD" )
   mydf = data.frame(
     predictedAge = as.numeric( pp[[2]] ),
     predictedGender = as.numeric( pp[[3]] ) )
