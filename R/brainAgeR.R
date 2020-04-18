@@ -178,13 +178,13 @@ brainAge <- function( x,
         nc = 2
         X = array( dim = c( batch_size, dim( templateSub ), nc ) )
         X2 = array( dim = c( batch_size, rep(ptch,3), nc ) )
+        bmask = thresholdImage( brainMask, 0.33, Inf )
+        fullImage = brainAgeR::standardizeIntensity( fullImage, bmask ) * bmask
+        randy = ANTsRNet::randomImageTransformAugmentation( fullImage,
+          interpolator = c( "linear", "linear" ),
+          list( list( fullImage ) ), list( fullImage ), sdAffine = sdAff, n = batch_size )
         for ( ind in 1:batch_size ) {
-          bmask = thresholdImage( brainMask, 0.33, Inf )
-          fullImage = brainAgeR::standardizeIntensity( fullImage, bmask ) * bmask
-          randy = ANTsRNet::randomImageTransformAugmentation( fullImage,
-            interpolator = c( "linear", "linear" ),
-            list( list( fullImage, fullImage ) ), list( fullImage ), sdAffine = sdaff, n = 1 )
-          fullImage = randy$outputPredictorList[[1]][[1]]
+          fullImage = randy$outputPredictorList[[ind]][[1]]
           imgG = resampleImageToTarget( fullImage, avgImg2 )
           imgGdiff = imgG - avgImg2
           pdiff = fullImage - avgImg
