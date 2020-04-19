@@ -146,18 +146,18 @@ brainAge <- function( x,
       ncogs = 1
       modelFN = system.file("extdata", "resNet4LayerLR64Card64b.h5", package = "brainAgeR", mustWork = TRUE)
       inputImageSize = list(NULL,NULL,NULL, nChannels )
-      mdl <- ANTsRNet::createResNetModel3D(inputImageSize, numberOfClassificationLabels = 1000,
+      model <- ANTsRNet::createResNetModel3D(
+        list(NULL,NULL,NULL,4), numberOfClassificationLabels = 1,
              layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
-             lowestResolution = 64, cardinality = 64, mode = "classification")
+             lowestResolution = 64, cardinality = 64, mode = "regression")
       layerName = as.character(
-        mdl$layers[[length(mdl$layers)-1 ]]$name )
-      idLayer <- layer_dense( get_layer(mdl, layerName )$output, nclass,
-        activation='sigmoid' ) # 'softmax' )
-      ageLayer <- layer_dense( get_layer(mdl, layerName )$output, ncogs, activation = 'linear' )
-      sexLayer <- layer_dense( get_layer(mdl, layerName )$output, 1,
+        model$layers[[length(model$layers)-1 ]]$name )
+      idLayer <- layer_dense( get_layer(model, layerName )$output, length(myclasses),
+        activation='softmax' )
+      ageLayer <- layer_dense( get_layer(model, layerName )$output, 1, activation = 'linear' )
+      sexLayer <- layer_dense( get_layer(model, layerName )$output, 1,
         activation = 'sigmoid' )
-#      inputPatch <- layer_input( patchShape )
-      model <- keras_model( inputs = mdl$input, # list( mdl$input, inputPatch ),
+      model <- keras_model( inputs = model$input,
           outputs = list(
             idLayer,
             ageLayer,
