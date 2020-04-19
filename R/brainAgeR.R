@@ -162,7 +162,7 @@ brainAge <- function( x,
             idLayer,
             ageLayer,
             sexLayer ) )
-      load_model_weights_hdf5( model, modelFN, by_name = TRUE )
+      load_model_weights_tf( model, modelFN, by_name = TRUE )
       model %>% compile(
         optimizer = optimizer_adam( lr = 1e-4 ),
         loss = list( "categorical_crossentropy", "mae", "binary_crossentropy" ),
