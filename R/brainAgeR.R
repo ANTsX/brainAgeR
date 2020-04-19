@@ -152,7 +152,7 @@ brainAge <- function( x,
              lowestResolution = 64, cardinality = 64, mode = "regression")
       layerName = as.character(
         model$layers[[length(model$layers)-1 ]]$name )
-      idLayer <- layer_dense( get_layer(model, layerName )$output, length(myclasses),
+      idLayer <- layer_dense( get_layer(model, layerName )$output, nclass,
         activation='softmax' )
       ageLayer <- layer_dense( get_layer(model, layerName )$output, 1, activation = 'linear' )
       sexLayer <- layer_dense( get_layer(model, layerName )$output, 1,
