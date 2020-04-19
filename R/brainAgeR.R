@@ -115,6 +115,7 @@ getBrainAgeModel <- function( modelPrefix ) {
   }
   nclass = 7
   ncogs = 1
+  nChannels = 4
   inputImageSize = list(NULL,NULL,NULL, nChannels )
   model <- ANTsRNet::createResNetModel3D(
     list(NULL,NULL,NULL,4), numberOfClassificationLabels = 1,
