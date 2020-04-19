@@ -21,7 +21,7 @@ brainAge(
 
 \item{templateBrainMask}{input template brain mask, optional}
 
-\item{model}{input deep model, optional}
+\item{model}{input deep model, see \code{getBrainAgeModel}}
 
 \item{polyOrder}{optional polynomial order for intensity matching (e.g. 1)}
 
@@ -33,13 +33,21 @@ brainAge(
 data frame of predictions and the brain age model
 }
 \description{
-Estimate brain age and related variable from input T1 MRI
+Estimate brain age and related variable from input T1 MRI.
 }
 \examples{
 
 \dontrun{
-myPredictions = brainAge( img, template, model )
+library( brainAgeR )
+library( ANTsR )
+library( keras )
+filename = system.file("extdata", "test_image.nii.gz", package = "brainAgeR", mustWork = TRUE)
+img = antsImageRead( filename ) # T1 image
+mdl = getBrainAgeModel( tempfile() )
+bage = brainAge( img, batch_size = 10, sdAff = 0.01, model = mdl )
+bage[[1]][,1:4]
 }
+
 }
 \author{
 Avants BB

@@ -84,14 +84,72 @@ brainAgePreprocessing <- function( x, template, templateBrainMask ) {
       affineMapping = aff ) )
 }
 
+
+
+
+#' getBrainAgeModel
+#'
+#' Create the brain age model data, downloading data as necessary. Data will be
+#' downloaded from \url{https://figshare.com/articles/pretrained_networks_for_deep_learning_applications/7246985}
+#'
+#' @param modelPrefix prefix identifying model file locations following \code{load_model_weights_tf}
+#' @return tensorflow model
+#' @author Avants BB
+#' @examples
+#'
+#' \dontrun{
+#' mdl = getBrainAgeModel( tempfile() )
+#' }
+#' @export
+getBrainAgeModel <- function( modelPrefix ) {
+  posts = c(
+    ".index",
+    ".data-00000-of-00002",
+    ".data-00001-of-00002"
+  )
+  mdlfns = paste0( modelPrefix, posts )
+  if ( ! file.exists( mdlfns[1] ) ) {
+    download.file("https://ndownloader.figshare.com/files/22346487", mdlfns[1])
+    download.file("https://ndownloader.figshare.com/files/22346481", mdlfns[2])
+    download.file("https://ndownloader.figshare.com/files/22346490", mdlfns[3])
+  }
+  nclass = 7
+  ncogs = 1
+  inputImageSize = list(NULL,NULL,NULL, nChannels )
+  model <- ANTsRNet::createResNetModel3D(
+    list(NULL,NULL,NULL,4), numberOfClassificationLabels = 1,
+         layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
+         lowestResolution = 64, cardinality = 64, mode = "regression")
+  layerName = as.character(
+    model$layers[[length(model$layers)-1 ]]$name )
+  idLayer <- layer_dense( get_layer(model, layerName )$output, nclass,
+    activation='softmax' )
+  ageLayer <- layer_dense( get_layer(model, layerName )$output, 1, activation = 'linear' )
+  sexLayer <- layer_dense( get_layer(model, layerName )$output, 1,
+    activation = 'sigmoid' )
+  model <- keras_model( inputs = model$input,
+      outputs = list(
+        idLayer,
+        ageLayer,
+        sexLayer ) )
+  load_model_weights_tf( model, modelPrefix )
+  model %>% compile(
+    optimizer = optimizer_adam( lr = 1e-4 ),
+    loss = list( "categorical_crossentropy", "mae", "binary_crossentropy" ),
+    loss_weights = c( 1./9., 0.1, 1. ),
+    metrics = list('accuracy') )
+  return( model )
+}
+
+
 #' brainAge
 #'
-#' Estimate brain age and related variable from input T1 MRI
+#' Estimate brain age and related variable from input T1 MRI.
 #'
 #' @param x input image
 #' @param template input template, optional
 #' @param templateBrainMask input template brain mask, optional
-#' @param model input deep model, optional
+#' @param model input deep model, see \code{getBrainAgeModel}
 #' @param polyOrder optional polynomial order for intensity matching (e.g. 1)
 #' @param batch_size greater than 1 uses simulation to add variance in estimated values
 #' @param sdAff larger values induce more variance
@@ -100,8 +158,16 @@ brainAgePreprocessing <- function( x, template, templateBrainMask ) {
 #' @examples
 #'
 #' \dontrun{
-#' myPredictions = brainAge( img, template, model )
+#' library( brainAgeR )
+#' library( ANTsR )
+#' library( keras )
+#' filename = system.file("extdata", "test_image.nii.gz", package = "brainAgeR", mustWork = TRUE)
+#' img = antsImageRead( filename ) # T1 image
+#' mdl = getBrainAgeModel( tempfile() )
+#' bage = brainAge( img, batch_size = 10, sdAff = 0.01, model = mdl )
+#' bage[[1]][,1:4]
 #' }
+#'
 #' @export brainAge
 #' @importFrom stats rnorm
 #' @importFrom ANTsRNet createResNetModel3D randomImageTransformAugmentation linMatchIntensity
@@ -140,35 +206,7 @@ brainAge <- function( x,
     return( baseInd )
     }
 
-    nChannels = 4
-    if ( missing( model ) ) {
-      nclass = 7
-      ncogs = 1
-      modelFN = system.file("extdata", "resNet4LayerLR64Card64b.h5", package = "brainAgeR", mustWork = TRUE)
-      inputImageSize = list(NULL,NULL,NULL, nChannels )
-      model <- ANTsRNet::createResNetModel3D(
-        list(NULL,NULL,NULL,4), numberOfClassificationLabels = 1,
-             layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
-             lowestResolution = 64, cardinality = 64, mode = "regression")
-      layerName = as.character(
-        model$layers[[length(model$layers)-1 ]]$name )
-      idLayer <- layer_dense( get_layer(model, layerName )$output, nclass,
-        activation='softmax' )
-      ageLayer <- layer_dense( get_layer(model, layerName )$output, 1, activation = 'linear' )
-      sexLayer <- layer_dense( get_layer(model, layerName )$output, 1,
-        activation = 'sigmoid' )
-      model <- keras_model( inputs = model$input,
-          outputs = list(
-            idLayer,
-            ageLayer,
-            sexLayer ) )
-      load_model_weights_tf( model, modelFN, by_name = TRUE )
-      model %>% compile(
-        optimizer = optimizer_adam( lr = 1e-4 ),
-        loss = list( "categorical_crossentropy", "mae", "binary_crossentropy" ),
-        loss_weights = c( 1./9., 0.1, 1. ),
-        metrics = list('accuracy') )
-      }
+  nChannels = 4
 
   imageAff = baprepro$imageAffine
   imageAffSub = resampleImageToTarget( imageAff, templateSub )
@@ -213,7 +251,7 @@ brainAge <- function( x,
   for ( k in 1:nrow( siteDF ) ) siteDF[k,] = siteDF[k,]/sum(siteDF[k,] )
   mydf <- cbind( mydf, siteDF )
   mydf$brainVolume = bvol
-  return( list( predictions=mydf, model=model ) )
+  return( list( predictions=mydf, model=model, array=myX ) )
 }
 
 
