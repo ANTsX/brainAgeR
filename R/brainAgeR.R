@@ -163,6 +163,11 @@ brainAge <- function( x,
             ageLayer,
             sexLayer ) )
       load_model_weights_hdf5( model, modelFN, by_name = TRUE )
+      model %>% compile(
+        optimizer = optimizer_adam( lr = 1e-4 ),
+        loss = list( "categorical_crossentropy", "mae", "binary_crossentropy" ),
+        loss_weights = c( 1./9., 0.1, 1. ),
+        metrics = list('accuracy') )
       }
 
   imageAff = baprepro$imageAffine
