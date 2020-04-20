@@ -110,15 +110,15 @@ getBrainAgeModel <- function( modelPrefix ) {
   if ( ! missing( modelPrefix ) ) {
     mdlfns = paste0( modelPrefix, posts )
     if ( ! file.exists( mdlfns[1] ) ) {
-      download.file("https://ndownloader.figshare.com/files/22346487", mdlfns[1])
-      download.file("https://ndownloader.figshare.com/files/22346481", mdlfns[2])
-      download.file("https://ndownloader.figshare.com/files/22346490", mdlfns[3])
+      download.file( "https://ndownloader.figshare.com/files/22352121", mdlfns[1] )
+      download.file( "https://ndownloader.figshare.com/files/22353867", mdlfns[2] )
+      download.file( "https://ndownloader.figshare.com/files/22352127", mdlfns[3] )
     }
   }
   nclass = 7
   ncogs = 1
   nChannels = 4
-
+  #############
   efficientAttention <- function( inputX, nf=16L, pool_size=2L, kernel_size = 3,
     instanceNormalization = FALSE, targetDimensionality = 3,
     concatenate = FALSE, wt = 0.9 ) {
