@@ -14,15 +14,15 @@ Description: Deep learning tools for predicting brain age and related variables 
 License: Apache License (>=2.0)
 LazyLoad: yes
 Depends:
-    R (>= 3.2)
-Imports:
+    R (>= 3.2),
     ANTsRCore,
     ANTsR,
     ANTsRNet,
-    knitr,
     keras (>= 2.2.5.0),
+    tensorflow (>= 1.5)
+Imports:
+    knitr,
     reticulate (>= 1.6.0.9002),
-    tensorflow (>= 1.5),
     tfruns (>= 1.0),
     magrittr,
     zeallot,
