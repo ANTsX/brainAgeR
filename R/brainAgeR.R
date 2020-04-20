@@ -92,7 +92,7 @@ brainAgePreprocessing <- function( x, template, templateBrainMask ) {
 #' Create the brain age model data, downloading data as necessary. Data will be
 #' downloaded from \url{https://figshare.com/articles/pretrained_networks_for_deep_learning_applications/7246985}
 #'
-#' @param modelPrefix prefix identifying model file locations following \code{load_model_weights_tf}
+#' @param modelPrefix prefix identifying model file locations following \code{load_model_weights_tf} (optional)
 #' @return tensorflow model
 #' @author Avants BB
 #' @examples
@@ -107,39 +107,110 @@ getBrainAgeModel <- function( modelPrefix ) {
     ".data-00000-of-00002",
     ".data-00001-of-00002"
   )
-  mdlfns = paste0( modelPrefix, posts )
-  if ( ! file.exists( mdlfns[1] ) ) {
-    download.file("https://ndownloader.figshare.com/files/22346487", mdlfns[1])
-    download.file("https://ndownloader.figshare.com/files/22346481", mdlfns[2])
-    download.file("https://ndownloader.figshare.com/files/22346490", mdlfns[3])
+  if ( ! missing( modelPrefix ) ) {
+    mdlfns = paste0( modelPrefix, posts )
+    if ( ! file.exists( mdlfns[1] ) ) {
+      download.file("https://ndownloader.figshare.com/files/22346487", mdlfns[1])
+      download.file("https://ndownloader.figshare.com/files/22346481", mdlfns[2])
+      download.file("https://ndownloader.figshare.com/files/22346490", mdlfns[3])
+    }
   }
   nclass = 7
   ncogs = 1
   nChannels = 4
-  inputImageSize = list(NULL,NULL,NULL, nChannels )
-  model <- ANTsRNet::createResNetModel3D(
+
+  efficientAttention <- function( inputX, nf=16L, pool_size=2L, kernel_size = 3,
+    instanceNormalization = FALSE, targetDimensionality = 3,
+    concatenate = FALSE, wt = 0.9 ) {
+    if ( wt > 1 ) wt = 1
+    if ( wt < 0 ) wt = 0
+    if ( targetDimensionality == 2 ) {
+      myconv = layer_conv_2d
+      mypool = layer_max_pooling_2d
+      myup = layer_upsampling_2d
+    } else {
+      myconv = layer_conv_3d
+      mypool = layer_max_pooling_3d
+      myup = layer_upsampling_3d
+    }
+    getShape <- function( shapein, targetDimensionality ) {
+      inshape = c( shapein$shape[1], shapein$shape[2], shapein$shape[3] )
+      if ( targetDimensionality == 3 )
+        inshape = c( shapein$shape[1], shapein$shape[2], shapein$shape[3], shapein$shape[4]  )
+      return( c( NULL, as.integer(  prod( inshape[1:targetDimensionality] ) ),
+          as.integer( inshape[targetDimensionality+1]) ) )
+    }
+    if ( instanceNormalization ) {
+      f <- inputX %>%
+        myconv( nf, kernel_size, activation='relu', padding='same'  ) %>%
+          layer_instance_normalization(  )
+      } else {
+        f <- inputX %>%
+          myconv( nf, kernel_size, activation='relu', padding='same'  )
+      }
+    f <- f %>% mypool(pool_size=rep(pool_size,targetDimensionality) )
+    flatf = f %>% layer_reshape( getShape( f, targetDimensionality ) )
+    s = tf$matmul( flatf, flatf, transpose_b = TRUE )
+    beta = tf$nn$softmax( s )  # attention map
+    g <- inputX %>%
+      myconv( nf, kernel_size, activation='relu', padding='same'  )
+    g <- g %>% mypool(pool_size=rep(pool_size,targetDimensionality) )
+    flatg = g %>% layer_reshape( getShape( g, targetDimensionality ) )
+    o = tf$matmul(beta, flatg )  # [bs, N, C]
+    targetShape1 = as.integer( inputX$shape[1] )
+    targetShape2 = as.integer( inputX$shape[2] )
+    reshapeVal1 = as.integer( targetShape1 / pool_size)
+    reshapeVal2 = as.integer( targetShape2 / pool_size)
+    if ( targetDimensionality == 3 ) {
+      targetShape3 = as.integer( inputX$shape[3] )
+      reshapeVal3 = as.integer( targetShape3 / pool_size)
+      }
+    lastChan = as.integer( o$shape[2] )
+    if ( targetDimensionality == 3 ) {
+      o = o %>% layer_reshape( c(NULL, reshapeVal1, reshapeVal2, reshapeVal3,  lastChan ) )
+      }
+    if ( targetDimensionality == 2 )
+      o = o %>% layer_reshape( c(NULL, reshapeVal1, reshapeVal2,  lastChan3 ) )
+    if ( pool_size > 1 )
+      o = o %>% myup( pool_size )
+    convo = myconv( o, as.integer(inputX$shape[targetDimensionality+1]), 1, activation='relu', padding='same'  )
+    if ( concatenate ) myatt = layer_concatenate( list( inputX, convo ) ) else
+      myatt = inputX * wt + convo * ( 1.0 - wt )
+    return( myatt )
+  }
+  ################################################################################
+  myinput <- layer_input( list(96,112,96,4) )
+  firstLayer <- efficientAttention( myinput, 8L, pool_size = 8L,
+    instanceNormalization = FALSE,
+    targetDimensionality = 3, concatenate = FALSE )
+  mdl <- ANTsRNet::createResNetModel3D(
     list(NULL,NULL,NULL,4), numberOfClassificationLabels = 1,
          layers = 1:4, residualBlockSchedule = c(3, 4, 6, 3),
          lowestResolution = 64, cardinality = 64, mode = "regression")
+  ################################################################################
   layerName = as.character(
-    model$layers[[length(model$layers)-1 ]]$name )
-  idLayer <- layer_dense( get_layer(model, layerName )$output, nclass,
+    mdl$layers[[length(mdl$layers)-1 ]]$name )
+  idLayer <- layer_dense( get_layer(mdl, layerName )$output, nclass,
     activation='softmax' )
-  ageLayer <- layer_dense( get_layer(model, layerName )$output, 1, activation = 'linear' )
-  sexLayer <- layer_dense( get_layer(model, layerName )$output, 1,
+  ageLayer <- layer_dense( get_layer(mdl, layerName )$output, 1, activation = 'linear' )
+  sexLayer <- layer_dense( get_layer(mdl, layerName )$output, 1,
     activation = 'sigmoid' )
-  model <- keras_model( inputs = model$input,
+  mdlFull <- keras_model( inputs = mdl$input,
       outputs = list(
         idLayer,
         ageLayer,
         sexLayer ) )
-  load_model_weights_tf( model, modelPrefix )
-  model %>% compile(
+  mdl2 = mdlFull( firstLayer )
+  mdlFull <- keras_model(
+    inputs = myinput,
+      outputs = mdl2 )
+  if ( ! missing( modelPrefix ) ) load_model_weights_tf( mdlFull, modelPrefix )
+  mdlFull %>% compile(
     optimizer = optimizer_adam( lr = 1e-4 ),
     loss = list( "categorical_crossentropy", "mae", "binary_crossentropy" ),
     loss_weights = c( 1./9., 0.1, 1. ),
     metrics = list('accuracy') )
-  return( model )
+  return( mdlFull )
 }
 
 
