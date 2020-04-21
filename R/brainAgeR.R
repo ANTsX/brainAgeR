@@ -92,7 +92,7 @@ brainAgePreprocessing <- function( x, template, templateBrainMask ) {
 #' Create the brain age model data, downloading data as necessary. Data will be
 #' downloaded from \url{https://figshare.com/articles/pretrained_networks_for_deep_learning_applications/7246985}
 #'
-#' @param modelPrefix prefix identifying model file locations following \code{load_model_weights_tf} (optional)
+#' @param modelPrefix prefix identifying directory for model file locations following \code{load_model_weights_tf} (optional)
 #' @return tensorflow model
 #' @author Avants BB
 #' @examples
@@ -103,17 +103,22 @@ brainAgePreprocessing <- function( x, template, templateBrainMask ) {
 #' @export
 getBrainAgeModel <- function( modelPrefix ) {
   posts = c(
-    ".index",
-    ".data-00000-of-00002",
-    ".data-00001-of-00002"
+    "brainAge2020_att3.index",
+    "brainAge2020_att3.data-00000-of-00002",
+    "brainAge2020_att3.data-00001-of-00002"
   )
   if ( ! missing( modelPrefix ) ) {
-    mdlfns = paste0( modelPrefix, posts )
+    mdlfns = paste0( modelPrefix, "/", posts )
+    myurl = "https://ndownloader.figshare.com/files/22365378"
     if ( ! file.exists( mdlfns[1] ) ) {
-      download.file( "https://ndownloader.figshare.com/files/22352121", mdlfns[1] )
-      download.file( "https://ndownloader.figshare.com/files/22353867", mdlfns[2] )
-      download.file( "https://ndownloader.figshare.com/files/22352127", mdlfns[3] )
-    }
+      tempfile = tempfile()
+      download.file( myurl, tempfile )
+      zip::unzip( tempfile, exdir =  modelPrefix )
+      unlink( tempfile )
+      }
+    modelfn = paste0( modelPrefix, "/brainAge2020_att3"  )
+    if ( ! all( file.exists( mdlfns )  ) )
+      stop( paste("download fail: please download  from", myurl, "and place in directory", modelPrefix) )
   }
   nclass = 7
   ncogs = 1
@@ -204,7 +209,7 @@ getBrainAgeModel <- function( modelPrefix ) {
   mdlFull <- keras_model(
     inputs = myinput,
       outputs = mdl2 )
-  if ( ! missing( modelPrefix ) ) load_model_weights_tf( mdlFull, modelPrefix )
+  if ( ! missing( modelPrefix ) ) load_model_weights_tf( mdlFull, modelfn )
   mdlFull %>% compile(
     optimizer = optimizer_adam( lr = 1e-4 ),
     loss = list( "categorical_crossentropy", "mae", "binary_crossentropy" ),

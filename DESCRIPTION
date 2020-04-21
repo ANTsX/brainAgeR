@@ -19,7 +19,8 @@ Depends:
     ANTsR,
     ANTsRNet,
     keras (>= 2.2.5.0),
-    tensorflow (>= 1.5)
+    tensorflow (>= 1.5),
+    zip
 Imports:
     knitr,
     reticulate (>= 1.6.0.9002),

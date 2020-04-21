@@ -7,7 +7,7 @@
 getBrainAgeModel(modelPrefix)
 }
 \arguments{
-\item{modelPrefix}{prefix identifying model file locations following \code{load_model_weights_tf}}
+\item{modelPrefix}{prefix identifying directory for model file locations following \code{load_model_weights_tf} (optional)}
 }
 \value{
 tensorflow model
