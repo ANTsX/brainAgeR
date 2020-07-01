@@ -127,61 +127,73 @@ getBrainAgeModel <- function( modelPrefix ) {
   efficientAttention <- function( inputX, nf=16L, pool_size=2L, kernel_size = 3,
     instanceNormalization = FALSE, targetDimensionality = 3,
     concatenate = FALSE, wt = 0.9 ) {
+    outputType = 'basic'
     if ( wt > 1 ) wt = 1
     if ( wt < 0 ) wt = 0
-    if ( targetDimensionality == 2 ) {
-      myconv = layer_conv_2d
-      mypool = layer_max_pooling_2d
-      myup = layer_upsampling_2d
+  if ( outputType == "none" ) return( inputX )
+  if ( ! outputType %in% c("basic","multiply","concatenate","attention") )
+    stop( paste( "outputType", outputType, "not one of basic multiply concatenate or attention" ) )
+  if ( targetDimensionality == 2 ) {
+    myconv = layer_conv_2d
+    mypool = layer_max_pooling_2d
+    myup = layer_upsampling_2d
+  } else {
+    myconv = layer_conv_3d
+    mypool = layer_max_pooling_3d
+    myup = layer_upsampling_3d
+  }
+  getShape <- function( shapein, targetDimensionality ) {
+    inshape = c(  )
+    for ( k in 2:(2+targetDimensionality) ) inshape[k-1] = shapein$shape[[k]]
+    return( c( NULL,
+      as.integer( inshape[targetDimensionality+1]),
+      as.integer(  prod( inshape[1:targetDimensionality] ) ) ) )
+  }
+  if ( instanceNormalization ) {
+    f <- inputX %>%
+      myconv( nf, kernel_size, padding='same'  ) %>%
+        layer_instance_normalization(  )
     } else {
-      myconv = layer_conv_3d
-      mypool = layer_max_pooling_3d
-      myup = layer_upsampling_3d
-    }
-    getShape <- function( shapein, targetDimensionality ) {
-      inshape = c( shapein$shape[1], shapein$shape[2], shapein$shape[3] )
-      if ( targetDimensionality == 3 )
-        inshape = c( shapein$shape[1], shapein$shape[2], shapein$shape[3], shapein$shape[4]  )
-      return( c( NULL, as.integer(  prod( inshape[1:targetDimensionality] ) ),
-          as.integer( inshape[targetDimensionality+1]) ) )
-    }
-    if ( instanceNormalization ) {
       f <- inputX %>%
-        myconv( nf, kernel_size, activation='relu', padding='same'  ) %>%
-          layer_instance_normalization(  )
-      } else {
-        f <- inputX %>%
-          myconv( nf, kernel_size, activation='relu', padding='same'  )
-      }
-    f <- f %>% mypool(pool_size=rep(pool_size,targetDimensionality) )
-    flatf = f %>% layer_reshape( getShape( f, targetDimensionality ) )
-    s = tf$matmul( flatf, flatf, transpose_b = TRUE )
-    beta = tf$nn$softmax( s )  # attention map
-    g <- inputX %>%
-      myconv( nf, kernel_size, activation='relu', padding='same'  )
-    g <- g %>% mypool(pool_size=rep(pool_size,targetDimensionality) )
-    flatg = g %>% layer_reshape( getShape( g, targetDimensionality ) )
-    o = tf$matmul(beta, flatg )  # [bs, N, C]
-    targetShape1 = as.integer( inputX$shape[1] )
-    targetShape2 = as.integer( inputX$shape[2] )
-    reshapeVal1 = as.integer( targetShape1 / pool_size)
-    reshapeVal2 = as.integer( targetShape2 / pool_size)
-    if ( targetDimensionality == 3 ) {
-      targetShape3 = as.integer( inputX$shape[3] )
-      reshapeVal3 = as.integer( targetShape3 / pool_size)
-      }
-    lastChan = as.integer( o$shape[2] )
-    if ( targetDimensionality == 3 ) {
-      o = o %>% layer_reshape( c(NULL, reshapeVal1, reshapeVal2, reshapeVal3,  lastChan ) )
-      }
-    if ( targetDimensionality == 2 )
-      o = o %>% layer_reshape( c(NULL, reshapeVal1, reshapeVal2,  lastChan3 ) )
-    if ( pool_size > 1 )
-      o = o %>% myup( pool_size )
-    convo = myconv( o, as.integer(inputX$shape[targetDimensionality+1]), 1, activation='relu', padding='same'  )
-    if ( concatenate ) myatt = layer_concatenate( list( inputX, convo ) ) else
-      myatt = inputX * wt + convo * ( 1.0 - wt )
-    return( myatt )
+        myconv( nf, kernel_size, padding='same'  ) # %>% layer_activation_selu()
+    }
+  f <- f %>% mypool(pool_size=rep(pool_size,targetDimensionality) )
+  flatf = f %>% layer_reshape( getShape( f, targetDimensionality ) )
+  s = tf$matmul( flatf, flatf, transpose_b = TRUE )
+  beta = tf$nn$softmax( s )  # attention map
+  g <- inputX %>%
+    myconv( nf, kernel_size, padding='same'  ) # %>% layer_activation_selu()
+  g <- g %>% mypool( pool_size = rep( pool_size, targetDimensionality ) )
+  flatg = g %>% layer_reshape( getShape( g, targetDimensionality ) )
+  o = tf$matmul( beta, flatg )  # [bs, N, C]
+  targetShape1 = as.integer( (inputX$shape)[[2]] )
+  targetShape2 = as.integer( (inputX$shape)[[3]] )
+  reshapeVal1 = as.integer( targetShape1 / pool_size)
+  reshapeVal2 = as.integer( targetShape2 / pool_size)
+  lastChan = as.integer( o$shape[[2]] )
+  nChannels = as.integer( (inputX$shape)[[4]] )
+  if ( targetDimensionality == 3 ) {
+    targetShape3 = as.integer( (inputX$shape)[[4]] )
+    reshapeVal3 = as.integer( targetShape3 / pool_size)
+    nChannels = as.integer( (inputX$shape)[[5]] )
+    }
+  if ( targetDimensionality == 3 ) {
+    o = o %>% layer_reshape( c(NULL, reshapeVal1, reshapeVal2, reshapeVal3,  lastChan ) )
+    }
+  if ( targetDimensionality == 2 )
+    o = o %>% layer_reshape( c(NULL, reshapeVal1, reshapeVal2,  lastChan ) )
+  if ( pool_size > 1 )
+    o = o %>% myup( pool_size )
+  convo = myconv( o, nChannels, 1, activation='relu', padding='same'  )
+  if ( outputType == "concatenate" ) {
+    myatt = layer_concatenate( list( inputX, convo ) ) %>%
+      layer_dense( nChannels )
+  } else if ( outputType == "attention") {
+    return( convo )
+  } else if ( outputType == "multiply") {
+    myatt = layer_multiply( list( inputX, convo ) )
+  } else myatt = inputX * (wt)  + convo * (1.0-wt) # sigma should be absorbed into conv values
+
   }
   ################################################################################
   myinput <- layer_input( list(96,112,96,4) )

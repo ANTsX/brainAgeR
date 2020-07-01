@@ -9,6 +9,7 @@ minimal example
 ```
 library( brainAgeR )
 library( ANTsR )
+library( tensorflow )
 library( keras )
 filename = system.file("extdata", "test_image.nii.gz", package = "brainAgeR", mustWork = TRUE)
 img = antsImageRead( filename ) # T1 image
