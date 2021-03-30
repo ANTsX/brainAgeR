@@ -192,7 +192,7 @@ getBrainAgeModel <- function( modelPrefix ) {
     return( convo )
   } else if ( outputType == "multiply") {
     myatt = layer_multiply( list( inputX, convo ) )
-  } else myatt = tf$math$multilpy( inputX, tf$cast(wt,inputX$dtype) )  + 
+  } else myatt = tf$math$multiply( inputX, tf$cast(wt,inputX$dtype) )  + 
      tf$math$multiply( convo , tf$cast(1.0 - wt,inputX$dtype) ) # sigma should be absorbed into conv values
 
   }
