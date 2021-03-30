@@ -19,7 +19,7 @@ Depends:
     ANTsR,
     ANTsRNet,
     keras (>= 2.2.5.0),
-    tensorflow (>= 1.5),
+    tensorflow (>= 2.0),
     zip
 Imports:
     knitr,
