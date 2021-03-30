@@ -192,9 +192,10 @@ getBrainAgeModel <- function( modelPrefix ) {
     return( convo )
   } else if ( outputType == "multiply") {
     myatt = layer_multiply( list( inputX, convo ) )
-  } else myatt = inputX * (wt)  + convo * (1.0-wt) # sigma should be absorbed into conv values
+  } else myatt = inputX * tf$cast(wt,inputX$dtype)  + convo * tf$cast(1.0 - wt,inputX$dtype)  # sigma should be absorbed into conv values
 
   }
+
   ################################################################################
   myinput <- layer_input( list(96,112,96,4) )
   firstLayer <- efficientAttention( myinput, 8L, pool_size = 8L,
